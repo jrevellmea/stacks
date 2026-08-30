@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stacks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#14181c;
+    --ink-2:#1c2228;
+    --paper:#ece5d3;
+    --paper-dim:#c9c2ae;
+    --brass:#b98f3f;
+    --brass-bright:#e0b45c;
+    --book:#3c7d70;
+    --dvd:#a24457;
+    --record:#c99a2e;
+    --line: rgba(236,229,211,0.14);
+    --danger:#c15b4a;
+    --radius: 14px;
+    --font-display: 'Fraunces', serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-body: 'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  #app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+
+  /* ---------- barcode rule: signature element ---------- */
+  .barcode-rule{
+    height:14px;
+    width:100%;
+    background-repeat:repeat-x;
+    background-size:auto 100%;
+    opacity:0.9;
+  }
+  .barcode-rule.thin{height:6px; opacity:0.55;}
+
+  /* ---------- header ---------- */
+  header{
+    padding:22px 20px 0 20px;
+  }
+  .brand-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+  }
+  h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-optical-sizing:auto;
+    font-size:34px;
+    letter-spacing:-0.01em;
+    margin:0;
+    color:var(--paper);
+  }
+  .tagline{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--paper-dim);
+    margin:2px 0 16px 0;
+  }
+  .icon-btn{
+    background:none;
+    border:none;
+    color:var(--paper);
+    padding:8px;
+    cursor:pointer;
+    border-radius:10px;
+  }
+  .icon-btn:hover{background:rgba(255,255,255,0.06);}
+  .icon-btn:focus-visible, button:focus-visible, input:focus-visible, .tab:focus-visible{
+    outline:2px solid var(--brass-bright);
+    outline-offset:2px;
+  }
+
+  .search-wrap{
+    padding:0 20px 12px 20px;
+  }
+  .search-input{
+    width:100%;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 14px;
+    color:var(--paper);
+    font-family:var(--font-body);
+    font-size:15px;
+  }
+  .search-input::placeholder{color:var(--paper-dim);}
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    padding:0 20px 14px 20px;
+    overflow-x:auto;
+  }
+  .tab{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    padding:8px 12px;
+    border-radius:8px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--paper-dim);
+    cursor:pointer;
+    white-space:nowrap;
+    position:relative;
+  }
+  .tab.active{
+    color:var(--ink);
+    background:var(--brass-bright);
+    border-color:var(--brass-bright);
+    font-weight:600;
+  }
+
+  /* ---------- list ---------- */
+  #list{
+    flex:1;
+    overflow-y:auto;
+    padding:0 20px 120px 20px;
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    padding:12px 0;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    align-items:center;
+  }
+  .thumb{
+    width:52px;
+    height:52px;
+    border-radius:8px;
+    flex-shrink:0;
+    background:var(--ink-2);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .thumb img{width:100%;height:100%;object-fit:cover;}
+  .thumb .dot{width:10px;height:10px;border-radius:50%;}
+  .row-main{flex:1; min-width:0;}
+  .row-title{
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:15px;
+    color:var(--paper);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .row-sub{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--paper-dim);
+    margin-top:2px;
+    letter-spacing:0.02em;
+  }
+  .type-chip{
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    padding:2px 6px;
+    border-radius:5px;
+    margin-right:6px;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:70px 30px 30px 30px;
+    color:var(--paper-dim);
+  }
+  .empty-state .barcode-rule{margin:0 auto 18px auto; width:90px;}
+  .empty-state h2{
+    font-family:var(--font-display);
+    color:var(--paper);
+    font-size:20px;
+    margin:0 0 8px 0;
+  }
+  .empty-state p{font-size:13.5px; line-height:1.5; margin:0;}
+
+  /* ---------- scan fab ---------- */
+  .fab{
+    position:fixed;
+    left:50%;
+    transform:translateX(-50%);
+    bottom:calc(24px + env(safe-area-inset-bottom));
+    width:68px;
+    height:68px;
+    border-radius:50%;
+    background:var(--brass-bright);
+    border:4px solid var(--ink);
+    box-shadow:0 0 0 2px var(--brass), 0 8px 20px rgba(0,0,0,0.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    max-width:480px;
+  }
+  .fab:active{transform:translateX(-50%) scale(0.94);}
+  .fab svg{width:28px;height:28px;}
+  .fab-plus{
+    position:fixed;
+    right:calc(50% - 240px + 20px);
+    bottom:calc(34px + env(safe-area-inset-bottom));
+    width:40px;height:40px;
+    border-radius:50%;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    color:var(--paper);
+    font-size:20px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  @media (max-width:520px){
+    .fab-plus{right:20px;}
+  }
+
+  /* ---------- scan overlay ---------- */
+  #scanOverlay{
+    position:fixed; inset:0;
+    background:var(--ink);
+    z-index:50;
+    display:none;
+    flex-direction:column;
+  }
+  #scanOverlay.open{display:flex;}
+  .scan-header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 16px 0 16px;
+    padding-top:calc(16px + env(safe-area-inset-top));
+  }
+  .scan-header h2{
+    font-family:var(--font-display);
+    font-size:18px; margin:0; color:var(--paper);
+  }
+  .scan-frame-wrap{
+    flex:1;
+    margin:16px;
+    border-radius:16px;
+    overflow:hidden;
+    position:relative;
+    background:#000;
+  }
+  #reader{width:100%; height:100%;}
+  #reader video{object-fit:cover !important; width:100% !important; height:100% !important;}
+  .scan-frame-wrap::before, .scan-frame-wrap::after{
+    content:'';
+    position:absolute; left:0; right:0; height:14px;
+    background-image: repeating-linear-gradient(90deg, var(--brass-bright) 0 3px, transparent 3px 6px, var(--brass-bright) 6px 8px, transparent 8px 14px, var(--brass-bright) 14px 16px, transparent 16px 24px);
+    z-index:3;
+  }
+  .scan-frame-wrap::before{top:0;}
+  .scan-frame-wrap::after{bottom:0;}
+  .laser{
+    position:absolute; left:6%; right:6%; height:2px;
+    background:var(--danger);
+    box-shadow:0 0 8px 1px rgba(193,91,74,0.8);
+    top:50%;
+    z-index:4;
+    animation: sweep 2.4s ease-in-out infinite;
+  }
+  @keyframes sweep{
+    0%{top:20%;} 50%{top:78%;} 100%{top:20%;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .laser{animation:none; top:50%;}
+  }
+  .scan-status{
+    text-align:center;
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.06em;
+    color:var(--paper-dim);
+    padding:4px 20px 22px 20px;
+    min-height:18px;
+  }
+  .scan-manual{
+    text-align:center;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  .link-btn{
+    background:none;border:none;
+    color:var(--brass-bright);
+    font-family:var(--font-mono);
+    font-size:12px;
+    text-decoration:underline;
+    cursor:pointer;
+  }
+
+  /* ---------- sheet (confirm / edit / add) ---------- */
+  #sheetOverlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:60;
+    display:none;
+    align-items:flex-end;
+  }
+  #sheetOverlay.open{display:flex;}
+  .sheet{
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+    max-width:480px;
+    margin:0 auto;
+    border-radius:20px 20px 0 0;
+    padding:20px 20px calc(24px + env(safe-area-inset-bottom)) 20px;
+    max-height:88vh;
+    overflow-y:auto;
+  }
+  .sheet-handle{
+    width:36px; height:4px; background:var(--paper-dim);
+    border-radius:3px; margin:0 auto 16px auto;
+  }
+  .sheet h2{
+    font-family:var(--font-display);
+    font-size:22px; margin:0 0 4px 0;
+  }
+  .sheet .barcode-label{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:#5a5346;
+    margin-bottom:16px;
+    letter-spacing:0.04em;
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:#5a5346;
+    margin-bottom:5px;
+  }
+  .field input{
+    width:100%;
+    padding:11px 12px;
+    border-radius:9px;
+    border:1px solid #c9c2ae;
+    background:#f7f3e9;
+    font-family:var(--font-body);
+    font-size:15px;
+    color:var(--ink);
+  }
+  .type-select{display:flex; gap:8px; margin-bottom:16px;}
+  .type-opt{
+    flex:1;
+    text-align:center;
+    padding:10px 6px;
+    border-radius:9px;
+    border:1.5px solid #c9c2ae;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    cursor:pointer;
+    background:#f7f3e9;
+  }
+  .type-opt.sel-book{border-color:var(--book); background:rgba(60,125,112,0.15); font-weight:600;}
+  .type-opt.sel-dvd{border-color:var(--dvd); background:rgba(162,68,87,0.15); font-weight:600;}
+  .type-opt.sel-record{border-color:var(--record); background:rgba(201,154,46,0.18); font-weight:600;}
+
+  .lookup-note{
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:10px 12px;
+    border-radius:9px;
+    background:#e2dcc9;
+    margin-bottom:14px;
+    color:#4a4436;
+  }
+  .btn-row{display:flex; gap:10px; margin-top:6px;}
+  .btn{
+    flex:1;
+    padding:13px 14px;
+    border-radius:10px;
+    border:none;
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--ink); color:var(--paper);}
+  .btn-secondary{background:transparent; border:1px solid #c9c2ae; color:var(--ink);}
+  .btn-danger{background:transparent; color:var(--danger); border:1px solid var(--danger);}
+
+  .spinner{
+    width:16px;height:16px;
+    border:2px solid rgba(255,255,255,0.3);
+    border-top-color:var(--brass-bright);
+    border-radius:50%;
+    display:inline-block;
+    animation:spin 0.7s linear infinite;
+    vertical-align:middle;
+    margin-right:6px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand-row">
+      <div>
+        <h1>Stacks</h1>
+        <div class="tagline">the shelf, scanned</div>
+      </div>
+    </div>
+  </header>
+  <div class="barcode-rule" id="topRule"></div>
+
+  <div class="search-wrap">
+    <input class="search-input" id="searchInput" type="text" placeholder="Search title or creator…">
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-filter="all">All</button>
+    <button class="tab" data-filter="book">Books</button>
+    <button class="tab" data-filter="dvd">DVDs</button>
+    <button class="tab" data-filter="record">Records</button>
+  </div>
+
+  <div id="list"></div>
+
+  <button class="fab" id="scanFab" aria-label="Scan a barcode">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#14181c" stroke-width="2" stroke-linecap="round">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <line x1="7" y1="3" x2="7" y2="21"/>
+      <line x1="11" y1="3" x2="11" y2="21"/>
+      <line x1="15" y1="3" x2="15" y2="21"/>
+      <line x1="19" y1="3" x2="19" y2="21"/>
+    </svg>
+  </button>
+  <button class="fab-plus" id="addManualFab" aria-label="Add item manually">+</button>
+
+  <!-- Scan overlay -->
+  <div id="scanOverlay">
+    <div class="scan-header">
+      <h2>Scan barcode</h2>
+      <button class="icon-btn" id="closeScan" aria-label="Close scanner">✕</button>
+    </div>
+    <div class="scan-frame-wrap">
+      <div id="reader"></div>
+      <div class="laser"></div>
+    </div>
+    <div class="scan-status" id="scanStatus">Point your camera at the item's barcode</div>
+    <div class="scan-manual">
+      <button class="link-btn" id="enterManually">Enter barcode manually instead</button>
+    </div>
+  </div>
+
+  <!-- Confirm / edit / add sheet -->
+  <div id="sheetOverlay">
+    <div class="sheet" id="sheet"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var catalog = [];
+  var currentFilter = 'all';
+  var currentSearch = '';
+  var html5QrCode = null;
+  var editingId = null;
+
+  var TYPE_META = {
+    book:   { label:'Book',   color:'var(--book)'   },
+    dvd:    { label:'DVD',    color:'var(--dvd)'    },
+    record: { label:'Record', color:'var(--record)' }
+  };
+
+  // barcode-rule pattern generator (SVG data-uri, varying bar widths like a real barcode)
+  function barcodeDataUri(color1, color2){
+    var bars = '';
+    var x = 0;
+    var seed = 7;
+    function rand(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+    while(x < 160){
+      var w = 1 + Math.floor(rand()*4);
+      if(rand() > 0.55){
+        bars += '<rect x="'+x+'" y="0" width="'+w+'" height="20" fill="'+color1+'"/>';
+      }
+      x += w + 1 + Math.floor(rand()*3);
+    }
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="20">'+bars+'</svg>';
+    return 'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+  }
+  document.getElementById('topRule').style.backgroundImage = barcodeDataUri('%23e0b45c');
+
+  // ---------- storage (plain browser localStorage — works once hosted on your own site) ----------
+  async function loadCatalog(){
+    try{
+      var raw = localStorage.getItem('stacks_catalog');
+      catalog = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      catalog = [];
+    }
+    render();
+  }
+  async function saveCatalog(){
+    try{
+      localStorage.setItem('stacks_catalog', JSON.stringify(catalog));
+    }catch(e){
+      console.error('Could not save catalog', e);
+      alert('Could not save — your browser storage may be full or blocked (e.g. private/incognito mode).');
+    }
+  }
+
+  // ---------- render list ----------
+  function render(){
+    var list = document.getElementById('list');
+    var items = catalog.filter(function(it){
+      var matchesType = currentFilter === 'all' || it.type === currentFilter;
+      var q = currentSearch.trim().toLowerCase();
+      var matchesSearch = !q || (it.title||'').toLowerCase().indexOf(q) > -1 || (it.creator||'').toLowerCase().indexOf(q) > -1;
+      return matchesType && matchesSearch;
+    }).sort(function(a,b){ return (b.addedAt||0) - (a.addedAt||0); });
+
+    if(items.length === 0){
+      var msg = catalog.length === 0
+        ? { h:'Empty shelf', p:'Tap the scan button below and hold a barcode up to your camera to add your first book, DVD, or record.' }
+        : { h:'No matches', p:'Nothing here for this filter or search. Try another tab or clear the search.' };
+      list.innerHTML =
+        '<div class="empty-state">' +
+          '<div class="barcode-rule" style="background-image:'+barcodeDataUri('%23555049')+'"></div>' +
+          '<h2>'+msg.h+'</h2><p>'+msg.p+'</p>' +
+        '</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(function(it){
+      var meta = TYPE_META[it.type] || TYPE_META.book;
+      var thumb = it.cover
+        ? '<img src="'+escapeAttr(it.cover)+'" alt="">'
+        : '<span class="dot" style="background:'+meta.color+'"></span>';
+      var sub = [meta.label, it.year].filter(Boolean).join(' · ');
+      return '<div class="row" data-id="'+it.id+'">' +
+        '<div class="thumb">'+thumb+'</div>' +
+        '<div class="row-main">' +
+          '<div class="row-title">'+escapeHtml(it.title || 'Untitled')+'</div>' +
+          '<div class="row-sub">'+escapeHtml(it.creator || '—')+' · '+escapeHtml(sub)+'</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    Array.prototype.forEach.call(list.querySelectorAll('.row'), function(row){
+      row.addEventListener('click', function(){
+        var item = catalog.find(function(c){ return c.id === row.getAttribute('data-id'); });
+        if(item) openSheetForEdit(item);
+      });
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function escapeAttr(s){ return escapeHtml(s); }
+
+  // ---------- tabs & search ----------
+  document.getElementById('tabs').addEventListener('click', function(e){
+    var btn = e.target.closest('.tab');
+    if(!btn) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+    currentFilter = btn.getAttribute('data-filter');
+    render();
+  });
+  document.getElementById('searchInput').addEventListener('input', function(e){
+    currentSearch = e.target.value;
+    render();
+  });
+
+  // ---------- barcode lookup ----------
+  async function lookupBarcode(barcode){
+    var isbnLike = /^(978|979)\d{10}$/.test(barcode) || /^\d{9}[\dXx]$/.test(barcode);
+
+    if(isbnLike){
+      try{
+        var r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:'+barcode+'&format=json&jscmd=data');
+        var data = await r.json();
+        var key = 'ISBN:'+barcode;
+        if(data && data[key]){
+          var d = data[key];
+          return {
+            type:'book',
+            title: d.title || '',
+            creator: (d.authors && d.authors[0] && d.authors[0].name) || '',
+            year: d.publish_date ? (d.publish_date.match(/\d{4}/)||[])[0] : '',
+            cover: d.cover ? d.cover.medium : ''
+          };
+        }
+      }catch(e){ /* fall through */ }
+    }
+
+    // general UPC/EAN lookup — covers DVDs, records/CDs, and books without ISBN prefix match
+    try{
+      var r2 = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode));
+      var data2 = await r2.json();
+      if(data2 && data2.items && data2.items.length){
+        var item = data2.items[0];
+        var cat = (item.category || '').toLowerCase();
+        var type = 'record';
+        if(cat.indexOf('book') > -1) type = 'book';
+        else if(cat.indexOf('movie') > -1 || cat.indexOf('tv') > -1 || cat.indexOf('dvd') > -1) type = 'dvd';
+        else if(cat.indexOf('music') > -1 || cat.indexOf('vinyl') > -1 || cat.indexOf('cd') > -1) type = 'record';
+        return {
+          type: type,
+          title: item.title || '',
+          creator: item.brand || (item.author) || '',
+          year: (item.publish_date || item.year || (item.title||'').match(/\b(19|20)\d{2}\b/)) ? ((item.title||'').match(/\b(19|20)\d{2}\b/)||[])[0] : '',
+          cover: (item.images && item.images[0]) || ''
+        };
+      }
+    }catch(e){ /* fall through */ }
+
+    // last resort: MusicBrainz, for records with clean barcodes
+    try{
+      var r3 = await fetch('https://musicbrainz.org/ws/2/release/?query=barcode:'+barcode+'&fmt=json');
+      var data3 = await r3.json();
+      if(data3 && data3.releases && data3.releases.length){
+        var rel = data3.releases[0];
+        return {
+          type:'record',
+          title: rel.title || '',
+          creator: (rel['artist-credit'] && rel['artist-credit'][0] && rel['artist-credit'][0].name) || '',
+          year: rel.date ? rel.date.slice(0,4) : '',
+          cover: rel.id ? ('https://coverartarchive.org/release/'+rel.id+'/front-250') : ''
+        };
+      }
+    }catch(e){ /* fall through */ }
+
+    return null;
+  }
+
+  // ---------- scanning ----------
+  var scanOverlay = document.getElementById('scanOverlay');
+  var scanStatus = document.getElementById('scanStatus');
+
+  document.getElementById('scanFab').addEventListener('click', startScan);
+  document.getElementById('closeScan').addEventListener('click', stopScan);
+  document.getElementById('enterManually').addEventListener('click', function(){
+    stopScan();
+    var code = prompt('Enter the barcode number:');
+    if(code && code.trim()) handleScannedCode(code.trim());
+  });
+
+  function startScan(){
+    scanOverlay.classList.add('open');
+    scanStatus.textContent = 'Point your camera at the item\'s barcode';
+    if(typeof Html5Qrcode === 'undefined'){
+      scanStatus.textContent = 'Camera library failed to load — use "Enter barcode manually" below.';
+      return;
+    }
+    html5QrCode = new Html5Qrcode('reader', {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39
+      ],
+      verbose:false
+    });
+    html5QrCode.start(
+      { facingMode:'environment' },
+      { fps:10, qrbox:{width:260, height:130} },
+      function(decodedText){
+        if(navigator.vibrate) navigator.vibrate(80);
+        stopScan();
+        handleScannedCode(decodedText);
+      },
+      function(){ /* ignore per-frame scan errors */ }
+    ).catch(function(err){
+      scanStatus.textContent = 'Camera unavailable (' + (err && err.message ? err.message : 'permission denied') + '). Use "Enter barcode manually" below.';
+    });
+  }
+
+  function stopScan(){
+    scanOverlay.classList.remove('open');
+    if(html5QrCode){
+      html5QrCode.stop().then(function(){
+        html5QrCode.clear();
+        html5QrCode = null;
+      }).catch(function(){ html5QrCode = null; });
+    }
+  }
+
+  async function handleScannedCode(barcode){
+    editingId = null;
+    openSheetLoading(barcode);
+    var result = await lookupBarcode(barcode);
+    openSheetForConfirm(barcode, result);
+  }
+
+  // ---------- sheet: loading / confirm / edit / manual add ----------
+  var sheetOverlay = document.getElementById('sheetOverlay');
+  var sheetEl = document.getElementById('sheet');
+
+  function openSheetLoading(barcode){
+    sheetEl.innerHTML =
+      '<div class="sheet-handle"></div>' +
+      '<h2>Looking it up…</h2>' +
+      '<div class="barcode-label">'+escapeHtml(barcode)+'</div>' +
+      '<div class="lookup-note"><span class="spinner" style="border-top-color:#14181c;border-color:rgba(20,24,28,0.2);border-top-color:#14181c;"></span>Checking library, media, and product databases</div>';
+    sheetOverlay.classList.add('open');
+  }
+
+  function openSheetForConfirm(barcode, result){
+    var found = !!result;
+    var data = result || { type:'book', title:'', creator:'', year:'', cover:'' };
+    renderSheetForm({
+      heading: found ? 'Confirm details' : 'No match found',
+      barcode: barcode,
+      note: found ? 'Found a match — check it over and save.' : 'Couldn\'t find this barcode automatically. Fill in the details yourself.',
+      data: data,
+      mode: 'create'
+    });
+  }
+
+  function openSheetForAddManual(){
+    editingId = null;
+    renderSheetForm({
+      heading:'Add item',
+      barcode:'',
+      note:'',
+      data:{ type:'book', title:'', creator:'', year:'', cover:'' },
+      mode:'create',
+      barcodeEditable:true
+    });
+  }
+
+  function openSheetForEdit(item){
+    editingId = item.id;
+    renderSheetForm({
+      heading:'Edit item',
+      barcode:item.barcode,
+      note:'',
+      data:item,
+      mode:'edit'
+    });
+  }
+
+  function renderSheetForm(opts){
+    var d = opts.data;
+    var barcodeField = opts.barcodeEditable
+      ? '<div class="field"><label>Barcode (optional)</label><input id="f_barcode" value="'+escapeAttr(opts.barcode||'')+'" placeholder="e.g. 9780141036144"></div>'
+      : (opts.barcode ? '<div class="barcode-label">'+escapeHtml(opts.barcode)+'</div>' : '');
+
+    sheetEl.innerHTML =
+      '<div class="sheet-handle"></div>' +
+      '<h2>'+opts.heading+'</h2>' +
+      barcodeField +
+      (opts.note ? '<div class="lookup-note">'+opts.note+'</div>' : '') +
+      '<div class="type-select" id="typeSelect">' +
+        '<div class="type-opt" data-type="book">Book</div>' +
+        '<div class="type-opt" data-type="dvd">DVD</div>' +
+        '<div class="type-opt" data-type="record">Record</div>' +
+      '</div>' +
+      '<div class="field"><label>Title</label><input id="f_title" value="'+escapeAttr(d.title||'')+'" placeholder="Title"></div>' +
+      '<div class="field"><label>Author / Artist / Director</label><input id="f_creator" value="'+escapeAttr(d.creator||'')+'" placeholder="Creator"></div>' +
+      '<div class="field"><label>Year</label><input id="f_year" value="'+escapeAttr(d.year||'')+'" placeholder="e.g. 1994" inputmode="numeric"></div>' +
+      '<div class="btn-row">' +
+        (opts.mode === 'edit' ? '<button class="btn btn-danger" id="deleteBtn">Delete</button>' : '<button class="btn btn-secondary" id="cancelBtn">Cancel</button>') +
+        '<button class="btn btn-primary" id="saveBtn">Save</button>' +
+      '</div>';
+
+    var selectedType = d.type || 'book';
+    function paintType(){
+      Array.prototype.forEach.call(sheetEl.querySelectorAll('.type-opt'), function(el){
+        el.classList.remove('sel-book','sel-dvd','sel-record');
+        if(el.getAttribute('data-type') === selectedType) el.classList.add('sel-'+selectedType);
+      });
+    }
+    paintType();
+    sheetEl.querySelector('#typeSelect').addEventListener('click', function(e){
+      var opt = e.target.closest('.type-opt');
+      if(!opt) return;
+      selectedType = opt.getAttribute('data-type');
+      paintType();
+    });
+
+    sheetOverlay.classList.add('open');
+
+    var cancelBtn = sheetEl.querySelector('#cancelBtn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeSheet);
+    var deleteBtn = sheetEl.querySelector('#deleteBtn');
+    if(deleteBtn) deleteBtn.addEventListener('click', function(){
+      catalog = catalog.filter(function(c){ return c.id !== editingId; });
+      saveCatalog();
+      closeSheet();
+      render();
+    });
+
+    sheetEl.querySelector('#saveBtn').addEventListener('click', function(){
+      var title = sheetEl.querySelector('#f_title').value.trim();
+      if(!title){
+        sheetEl.querySelector('#f_title').focus();
+        return;
+      }
+      var creator = sheetEl.querySelector('#f_creator').value.trim();
+      var year = sheetEl.querySelector('#f_year').value.trim();
+      var barcodeVal = opts.barcodeEditable ? sheetEl.querySelector('#f_barcode').value.trim() : opts.barcode;
+
+      if(opts.mode === 'edit'){
+        var item = catalog.find(function(c){ return c.id === editingId; });
+        item.title = title; item.creator = creator; item.year = year; item.type = selectedType;
+      } else {
+        catalog.push({
+          id: 'itm_' + Date.now() + '_' + Math.floor(Math.random()*10000),
+          barcode: barcodeVal || '',
+          type: selectedType,
+          title: title,
+          creator: creator,
+          year: year,
+          cover: d.cover || '',
+          addedAt: Date.now()
+        });
+      }
+      saveCatalog();
+      closeSheet();
+      render();
+    });
+  }
+
+  function closeSheet(){
+    sheetOverlay.classList.remove('open');
+    editingId = null;
+  }
+  sheetOverlay.addEventListener('click', function(e){
+    if(e.target === sheetOverlay) closeSheet();
+  });
+
+  document.getElementById('addManualFab').addEventListener('click', openSheetForAddManual);
+
+  loadCatalog();
+})();
+</script>
+</body>
+</html>
