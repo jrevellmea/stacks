@@ -435,6 +435,12 @@
         <h1>Stacks</h1>
         <div class="tagline">the shelf, scanned</div>
       </div>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 7.07 4.24l.06.06A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.96z"/>
+        </svg>
+      </button>
     </div>
   </header>
   <div class="barcode-rule" id="topRule"></div>
@@ -603,6 +609,11 @@
     render();
   });
 
+  function getPersonalProxy(){
+    try{ return (localStorage.getItem('stacks_proxy_url') || '').trim().replace(/\/+$/, ''); }
+    catch(e){ return ''; }
+  }
+
   // ---------- barcode lookup ----------
   async function lookupBarcode(barcode){
     var diagnostics = [];
@@ -633,11 +644,17 @@
     // upcitemdb blocks direct browser requests, so we try a couple of CORS proxies in sequence
     var upcTarget = 'https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode);
     var proxies = [
-      { name:'direct', url: upcTarget },
+      { name:'direct', url: upcTarget }
+    ];
+    var personalProxy = getPersonalProxy();
+    if(personalProxy){
+      proxies.push({ name:'your proxy', url: personalProxy + '?url=' + encodeURIComponent(upcTarget) });
+    }
+    proxies.push(
       { name:'corsproxy.io', url: 'https://corsproxy.io/?url='+encodeURIComponent(upcTarget) },
       { name:'codetabs', url: 'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(upcTarget) },
       { name:'allorigins', url: 'https://api.allorigins.win/raw?url='+encodeURIComponent(upcTarget) }
-    ];
+    );
 
     async function fetchWithTimeout(url, ms){
       var controller = new AbortController();
@@ -909,6 +926,30 @@
   });
 
   document.getElementById('addManualFab').addEventListener('click', openSheetForAddManual);
+  document.getElementById('settingsBtn').addEventListener('click', openSettingsSheet);
+
+  function openSettingsSheet(){
+    var current = getPersonalProxy();
+    sheetEl.innerHTML =
+      '<div class="sheet-handle"></div>' +
+      '<h2>Settings</h2>' +
+      '<div class="lookup-note">If you\'ve deployed the Cloudflare Worker proxy, paste its URL here. DVD and record lookups will try it first, before falling back to public proxies.</div>' +
+      '<div class="field"><label>Your proxy URL (optional)</label><input id="f_proxy" value="'+escapeAttr(current)+'" placeholder="https://stacks-proxy.yourname.workers.dev"></div>' +
+      '<div class="btn-row">' +
+        '<button class="btn btn-secondary" id="proxyCancelBtn">Cancel</button>' +
+        '<button class="btn btn-primary" id="proxySaveBtn">Save</button>' +
+      '</div>';
+    sheetOverlay.classList.add('open');
+    sheetEl.querySelector('#proxyCancelBtn').addEventListener('click', closeSheet);
+    sheetEl.querySelector('#proxySaveBtn').addEventListener('click', function(){
+      var val = sheetEl.querySelector('#f_proxy').value.trim();
+      try{
+        if(val) localStorage.setItem('stacks_proxy_url', val);
+        else localStorage.removeItem('stacks_proxy_url');
+      }catch(e){}
+      closeSheet();
+    });
+  }
 
   loadCatalog();
 })();
