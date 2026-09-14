@@ -630,8 +630,10 @@
     }
 
     // general UPC/EAN lookup — covers DVDs, records/CDs, and books without ISBN prefix match
+    // routed through a CORS proxy because upcitemdb's API blocks direct browser requests
     try{
-      var r2 = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode));
+      var upcTarget = 'https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode);
+      var r2 = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(upcTarget));
       if(!r2.ok) diagnostics.push('Product DB: HTTP ' + r2.status + (r2.status === 429 ? ' (daily free-tier limit likely reached)' : ''));
       var data2 = await r2.json();
       if(data2 && data2.items && data2.items.length){
