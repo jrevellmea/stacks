@@ -605,6 +605,7 @@
 
   // ---------- barcode lookup ----------
   async function lookupBarcode(barcode){
+    var diagnostics = [];
     var isbnLike = /^(978|979)\d{10}$/.test(barcode) || /^\d{9}[\dXx]$/.test(barcode);
 
     if(isbnLike){
@@ -614,20 +615,24 @@
         var key = 'ISBN:'+barcode;
         if(data && data[key]){
           var d = data[key];
-          return {
+          return { result: {
             type:'book',
             title: d.title || '',
             creator: (d.authors && d.authors[0] && d.authors[0].name) || '',
             year: d.publish_date ? (d.publish_date.match(/\d{4}/)||[])[0] : '',
             cover: d.cover ? d.cover.medium : ''
-          };
+          }, diagnostics: diagnostics };
         }
-      }catch(e){ /* fall through */ }
+        diagnostics.push('Open Library: no record for this ISBN');
+      }catch(e){ diagnostics.push('Open Library: request failed (' + (e && e.message ? e.message : 'network/CORS error') + ')'); }
+    } else {
+      diagnostics.push('Open Library: skipped (barcode is not ISBN-shaped)');
     }
 
     // general UPC/EAN lookup — covers DVDs, records/CDs, and books without ISBN prefix match
     try{
       var r2 = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode));
+      if(!r2.ok) diagnostics.push('Product DB: HTTP ' + r2.status + (r2.status === 429 ? ' (daily free-tier limit likely reached)' : ''));
       var data2 = await r2.json();
       if(data2 && data2.items && data2.items.length){
         var item = data2.items[0];
@@ -636,15 +641,16 @@
         if(cat.indexOf('book') > -1) type = 'book';
         else if(cat.indexOf('movie') > -1 || cat.indexOf('tv') > -1 || cat.indexOf('dvd') > -1) type = 'dvd';
         else if(cat.indexOf('music') > -1 || cat.indexOf('vinyl') > -1 || cat.indexOf('cd') > -1) type = 'record';
-        return {
+        return { result: {
           type: type,
           title: item.title || '',
           creator: item.brand || (item.author) || '',
           year: (item.publish_date || item.year || (item.title||'').match(/\b(19|20)\d{2}\b/)) ? ((item.title||'').match(/\b(19|20)\d{2}\b/)||[])[0] : '',
           cover: (item.images && item.images[0]) || ''
-        };
+        }, diagnostics: diagnostics };
       }
-    }catch(e){ /* fall through */ }
+      diagnostics.push('Product DB: reached OK, but no item found for this barcode');
+    }catch(e){ diagnostics.push('Product DB: request failed (' + (e && e.message ? e.message : 'network/CORS error') + ')'); }
 
     // last resort: MusicBrainz, for records with clean barcodes
     try{
@@ -652,17 +658,18 @@
       var data3 = await r3.json();
       if(data3 && data3.releases && data3.releases.length){
         var rel = data3.releases[0];
-        return {
+        return { result: {
           type:'record',
           title: rel.title || '',
           creator: (rel['artist-credit'] && rel['artist-credit'][0] && rel['artist-credit'][0].name) || '',
           year: rel.date ? rel.date.slice(0,4) : '',
           cover: rel.id ? ('https://coverartarchive.org/release/'+rel.id+'/front-250') : ''
-        };
+        }, diagnostics: diagnostics };
       }
-    }catch(e){ /* fall through */ }
+      diagnostics.push('MusicBrainz: no release found');
+    }catch(e){ diagnostics.push('MusicBrainz: request failed (' + (e && e.message ? e.message : 'network/CORS error') + ')'); }
 
-    return null;
+    return { result: null, diagnostics: diagnostics };
   }
 
   // ---------- scanning ----------
@@ -722,8 +729,8 @@
   async function handleScannedCode(barcode){
     editingId = null;
     openSheetLoading(barcode);
-    var result = await lookupBarcode(barcode);
-    openSheetForConfirm(barcode, result);
+    var lookup = await lookupBarcode(barcode);
+    openSheetForConfirm(barcode, lookup.result, lookup.diagnostics);
   }
 
   // ---------- sheet: loading / confirm / edit / manual add ----------
@@ -739,13 +746,17 @@
     sheetOverlay.classList.add('open');
   }
 
-  function openSheetForConfirm(barcode, result){
+  function openSheetForConfirm(barcode, result, diagnostics){
     var found = !!result;
     var data = result || { type:'book', title:'', creator:'', year:'', cover:'' };
+    var note = found
+      ? 'Found a match — check it over and save.'
+      : 'Couldn\'t find this barcode automatically. Fill in the details yourself.' +
+        (diagnostics && diagnostics.length ? '<br><br><span style="font-size:10.5px; opacity:0.75;">' + diagnostics.map(escapeHtml).join('<br>') + '</span>' : '');
     renderSheetForm({
       heading: found ? 'Confirm details' : 'No match found',
       barcode: barcode,
-      note: found ? 'Found a match — check it over and save.' : 'Couldn\'t find this barcode automatically. Fill in the details yourself.',
+      note: note,
       data: data,
       mode: 'create'
     });
