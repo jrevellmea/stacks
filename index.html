@@ -630,29 +630,60 @@
     }
 
     // general UPC/EAN lookup — covers DVDs, records/CDs, and books without ISBN prefix match
-    // routed through a CORS proxy because upcitemdb's API blocks direct browser requests
-    try{
-      var upcTarget = 'https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode);
-      var r2 = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(upcTarget));
-      if(!r2.ok) diagnostics.push('Product DB: HTTP ' + r2.status + (r2.status === 429 ? ' (daily free-tier limit likely reached)' : ''));
-      var data2 = await r2.json();
-      if(data2 && data2.items && data2.items.length){
-        var item = data2.items[0];
-        var cat = (item.category || '').toLowerCase();
-        var type = 'record';
-        if(cat.indexOf('book') > -1) type = 'book';
-        else if(cat.indexOf('movie') > -1 || cat.indexOf('tv') > -1 || cat.indexOf('dvd') > -1) type = 'dvd';
-        else if(cat.indexOf('music') > -1 || cat.indexOf('vinyl') > -1 || cat.indexOf('cd') > -1) type = 'record';
-        return { result: {
-          type: type,
-          title: item.title || '',
-          creator: item.brand || (item.author) || '',
-          year: (item.publish_date || item.year || (item.title||'').match(/\b(19|20)\d{2}\b/)) ? ((item.title||'').match(/\b(19|20)\d{2}\b/)||[])[0] : '',
-          cover: (item.images && item.images[0]) || ''
-        }, diagnostics: diagnostics };
+    // upcitemdb blocks direct browser requests, so we try a couple of CORS proxies in sequence
+    var upcTarget = 'https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode);
+    var proxies = [
+      { name:'direct', url: upcTarget },
+      { name:'corsproxy.io', url: 'https://corsproxy.io/?url='+encodeURIComponent(upcTarget) },
+      { name:'codetabs', url: 'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(upcTarget) },
+      { name:'allorigins', url: 'https://api.allorigins.win/raw?url='+encodeURIComponent(upcTarget) }
+    ];
+
+    async function fetchWithTimeout(url, ms){
+      var controller = new AbortController();
+      var timer = setTimeout(function(){ controller.abort(); }, ms);
+      try{
+        var res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        return res;
+      }catch(e){
+        clearTimeout(timer);
+        throw e;
       }
-      diagnostics.push('Product DB: reached OK, but no item found for this barcode');
-    }catch(e){ diagnostics.push('Product DB: request failed (' + (e && e.message ? e.message : 'network/CORS error') + ')'); }
+    }
+
+    var data2 = null;
+    for(var p = 0; p < proxies.length; p++){
+      try{
+        var rp = await fetchWithTimeout(proxies[p].url, 6000);
+        if(!rp.ok){
+          diagnostics.push('Product DB via ' + proxies[p].name + ': HTTP ' + rp.status);
+          continue;
+        }
+        data2 = await rp.json();
+        break;
+      }catch(e){
+        var reason = (e && e.name === 'AbortError') ? 'timed out' : (e && e.message ? e.message : 'failed');
+        diagnostics.push('Product DB via ' + proxies[p].name + ': ' + reason);
+      }
+    }
+
+    if(data2 && data2.items && data2.items.length){
+      var item = data2.items[0];
+      var cat = (item.category || '').toLowerCase();
+      var type = 'record';
+      if(cat.indexOf('book') > -1) type = 'book';
+      else if(cat.indexOf('movie') > -1 || cat.indexOf('tv') > -1 || cat.indexOf('dvd') > -1) type = 'dvd';
+      else if(cat.indexOf('music') > -1 || cat.indexOf('vinyl') > -1 || cat.indexOf('cd') > -1) type = 'record';
+      return { result: {
+        type: type,
+        title: item.title || '',
+        creator: item.brand || (item.author) || '',
+        year: (item.publish_date || item.year || (item.title||'').match(/\b(19|20)\d{2}\b/)) ? ((item.title||'').match(/\b(19|20)\d{2}\b/)||[])[0] : '',
+        cover: (item.images && item.images[0]) || ''
+      }, diagnostics: diagnostics };
+    }
+    diagnostics.push('Product DB: reached OK, but no item found for this barcode');
 
     // last resort: MusicBrainz, for records with clean barcodes
     try{
